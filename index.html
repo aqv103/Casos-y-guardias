@@ -1,0 +1,906 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<style>:root{padding-block:env(safe-area-inset-top,0px) env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Guardias y Cobros</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Concepto: libro de registro de despacho. Cabecera fija con pestañas, resumen de cobros arriba,
+   calendario mensual para guardias y listas con filas separadas por filetes dentro de una sola tarjeta. */
+:root{
+  --bg:#F1F5F8; --surface:#FFFFFF; --surface2:#E6EDF2; --line:#D3DDE5;
+  --ink:#13222D; --muted:#566B79; --accent:#1D5C73; --on-accent:#FFFFFF;
+  --oficio:#1D5C73; --privado:#7B3F6E;
+  --ok:#1F7A4D; --warn:#9A5D08; --bad:#B3261E;
+  --f-display:"Bricolage Grotesque",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1A22; --surface:#15252F; --surface2:#1C303C; --line:#2A4150;
+    --ink:#E6EEF3; --muted:#94A9B7; --accent:#5BB4D1; --on-accent:#07202B;
+    --oficio:#5BB4D1; --privado:#D08BC0;
+    --ok:#5CC590; --warn:#E0A44A; --bad:#F0817A;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1A22; --surface:#15252F; --surface2:#1C303C; --line:#2A4150;
+  --ink:#E6EEF3; --muted:#94A9B7; --accent:#5BB4D1; --on-accent:#07202B;
+  --oficio:#5BB4D1; --privado:#D08BC0;
+  --ok:#5CC590; --warn:#E0A44A; --bad:#F0817A;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html.lock{overflow:hidden}
+body{
+  background:var(--bg); color:var(--ink);
+  font:15px/1.5 var(--f-body);
+  padding-block:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bg)}
+h1,h2,h3,p,dl,dd,ul{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1040px;margin:0 auto}
+.muted{color:var(--muted)}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+/* Cabecera */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);padding-block:14px 10px}
+.top-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.tagline{font-size:13px;color:var(--muted);margin-bottom:8px;text-wrap:balance}
+.brand{font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:-.01em;line-height:1.1}
+.top-tools{display:flex;align-items:center;gap:10px;min-width:0}
+.sync{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);white-space:nowrap}
+.sync i{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+.sync.ok i{background:var(--ok)}
+.sync.warn i{background:var(--warn)}
+.tabs{display:flex;gap:4px;background:var(--surface2);padding:4px;border-radius:12px}
+.tab{flex:1;min-height:42px;border:1px solid transparent;background:transparent;border-radius:9px;font-weight:500;color:var(--muted);padding:0 8px}
+.tab[aria-current="page"]{background:var(--surface);color:var(--ink);border-color:var(--line)}
+.tab small{font-family:var(--f-mono);font-size:11px;margin-left:4px;opacity:.8}
+
+main{padding-block:12px 96px}
+.sec-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.sec-head h2{font-family:var(--f-display);font-size:20px;letter-spacing:-.01em}
+
+/* Botones */
+.btn{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-weight:500}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--accent);padding:0 10px}
+.btn.sm{min-height:36px;padding:0 12px;font-size:14px}
+.icon{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:20px;line-height:1}
+
+/* Tarjetas */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.pad{padding:18px}
+.card-title{font-family:var(--f-display);font-size:17px;padding:16px 18px 4px}
+.card-sub{font-size:13px;color:var(--muted);padding:0 18px 12px}
+.grid{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:860px){.grid.two{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}}
+.stack{display:grid;gap:16px;align-content:start}
+
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.hero{padding:22px 20px}
+.big{font-family:var(--f-display);font-weight:700;font-size:clamp(36px,9vw,52px);letter-spacing:-.02em;line-height:1.05;margin-top:6px;font-variant-numeric:tabular-nums}
+.stats{display:flex;flex-wrap:wrap;gap:12px 28px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.stats dt{font-size:12px;color:var(--muted)}
+.stats dd{font-family:var(--f-mono);font-size:17px;font-weight:500;margin-top:2px}
+.bad{color:var(--bad)} .ok{color:var(--ok)} .warn{color:var(--warn)}
+
+/* Gráfico */
+.chart{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;height:190px;padding:0 14px 14px}
+.col{display:grid;grid-template-rows:auto 1fr auto;gap:4px;min-width:0}
+.col .val{font-family:var(--f-mono);font-size:10.5px;color:var(--muted);text-align:center;min-height:14px;white-space:nowrap}
+.col .well{display:flex;align-items:flex-end}
+.col .bar{width:100%;border-radius:5px 5px 2px 2px;background:var(--accent);min-height:3px}
+.col .bar.late{background:var(--bad)}
+.col .bar.zero{background:var(--line)}
+.col .bar.later{background:color-mix(in srgb,var(--accent) 45%,var(--surface))}
+.col .lab{font-size:11px;color:var(--muted);text-align:center;text-transform:capitalize;white-space:nowrap}
+
+/* Filas */
+.list{display:grid}
+.row{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:4px 12px;padding:14px 18px;border-top:1px solid var(--line);align-items:start}
+.row:first-child{border-top:0}
+.datebox{grid-row:span 2;width:48px;height:52px;border-radius:9px;background:var(--surface2);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}
+.datebox b{font-family:var(--f-mono);font-size:18px;font-weight:600}
+.datebox span{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.row-title{font-weight:600;overflow-wrap:anywhere}
+.row-meta{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;font-size:13px;color:var(--muted);margin-top:2px}
+.row-pay{font-size:13px;color:var(--muted);margin-top:2px}
+.row-side{grid-column:3;grid-row:1 / span 2;text-align:right;display:grid;gap:6px;justify-items:end;align-content:start}
+.amount{font-family:var(--f-mono);font-weight:600;font-variant-numeric:tabular-nums}
+.row-actions{grid-column:2 / -1;display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.chip{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;border:1px solid color-mix(in srgb,currentColor 35%,transparent);border-radius:6px;padding:1px 6px}
+.chip.oficio{color:var(--oficio)} .chip.privado{color:var(--privado)}
+.pill{font-size:12px;font-weight:600;border-radius:999px;padding:2px 10px;white-space:nowrap}
+.pill.pendiente{color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,transparent)}
+.pill.retrasado{color:var(--bad);background:color-mix(in srgb,var(--bad) 14%,transparent)}
+.pill.cobrado{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}
+.empty{text-align:center;padding:28px 18px;color:var(--muted)}
+.empty h3{font-family:var(--f-display);color:var(--ink);font-size:20px;margin-bottom:6px}
+.empty p{max-width:46ch;margin:0 auto 16px}
+.empty .btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.note{font-size:13px;color:var(--muted);padding:10px 14px;border:1px dashed var(--line);border-radius:10px;margin-bottom:12px}
+
+/* Calendario */
+.cal-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 14px 8px}
+.cal-head h3{font-family:var(--f-display);font-size:18px;text-transform:capitalize;flex:1;text-align:center}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:0 12px 14px}
+.dow{font-size:11px;text-align:center;color:var(--muted);font-weight:600;padding:4px 0}
+.day{min-height:54px;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:4px 4px 6px;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;text-align:left}
+.day.blank{border-color:transparent;background:transparent;cursor:default}
+.day b{font-family:var(--f-mono);font-size:13px;font-weight:500;min-width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:11px}
+.day.today b{background:var(--accent);color:var(--on-accent)}
+.day.sel{outline:2px solid var(--accent);outline-offset:-1px}
+.dots{display:flex;gap:3px;flex-wrap:wrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--oficio)}
+.dot.privado{background:var(--privado)}
+.dot.paid{opacity:.35}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);padding:0 18px 14px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dayhead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 18px;flex-wrap:wrap}
+.dayhead h3{font-family:var(--f-display);font-size:17px}
+
+/* Filtros */
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.seg{display:inline-flex;background:var(--surface2);padding:3px;border-radius:10px;gap:2px}
+.seg button{border:1px solid transparent;background:transparent;border-radius:7px;min-height:36px;padding:0 12px;font-size:14px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);border-color:var(--line)}
+.search{flex:1;min-width:180px}
+
+.lockbox{max-width:460px;margin:24px auto}
+.authseg{display:flex;margin-bottom:18px}.authseg button{flex:1}
+.lock-h{font-family:var(--f-display);font-size:22px;margin-bottom:8px}
+.lock-form{display:grid;gap:14px;margin-top:16px}
+.lockbox .field input{width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:16px}
+.rk{font-size:19px;letter-spacing:.04em;padding:14px;background:var(--surface2);border-radius:10px;text-align:center;overflow-wrap:anywhere;user-select:all;margin:16px 0 12px;font-weight:500}
+.rk-actions{display:flex;gap:8px;margin-bottom:12px}
+/* Formularios */
+.field{display:grid;gap:6px}
+.field label,.lbl{font-size:13px;font-weight:600}
+.field input[type=text],.field input[type=date],.field input[type=number],.field select,.field textarea{
+  width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:16px}
+.field textarea{min-height:84px;resize:vertical}
+.hint{font-size:12px;color:var(--muted)}
+.two-col{display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:520px){.two-col{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.check{display:flex;align-items:center;gap:10px;min-height:44px;font-weight:500}
+.check input{width:20px;height:20px;accent-color:var(--accent)}
+
+/* Hoja de edición */
+.overlay{position:fixed;inset:0;background:rgba(5,15,22,.55);z-index:40}
+.sheet{position:fixed;z-index:50;left:0;right:0;bottom:0;max-height:92dvh;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:18px 18px 0 0}
+.sheet header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.sheet h2{font-family:var(--f-display);font-size:19px}
+.sheet .fields{padding:16px 18px;display:grid;gap:14px;overflow:auto}
+.sheet footer{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:12px 18px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}
+.sheet footer .grp{display:flex;gap:8px;flex-wrap:wrap}
+.err{color:var(--bad);font-size:13px;font-weight:500}
+@media (min-width:700px){
+  .sheet{left:50%;right:auto;bottom:auto;top:50%;transform:translate(-50%,-50%);width:min(580px,calc(100vw - 32px));max-height:88dvh;border-radius:16px}
+  .sheet footer{padding-bottom:12px}
+}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:60;max-width:calc(100vw - 32px)}
+.bottom-tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+@media (prefers-reduced-motion: no-preference){
+  .btn,.tab,.day{transition:border-color .12s,background-color .12s}
+}
+</style>
+</head><body>
+
+<div class="wrap">
+  <header class="top">
+    <p class="tagline">Creado para los abogados que quieran más control sobre sus facturas</p>
+    <div class="top-row">
+      <h1 class="brand">Guardias y Cobros</h1>
+      <div class="top-tools">
+        <span class="sync" id="sync"><i></i><span>Conectando</span></span>
+        <button class="btn sm" data-action="settings" type="button">Plazos</button>
+        <button class="btn sm" data-action="lock" id="lockbtn" type="button" hidden>Bloquear</button>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="Secciones"></nav>
+  </header>
+  <main id="view"></main>
+</div>
+<div id="sheet-root"></div>
+<div id="toast-root" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------- utilidades ---------- */
+var $=function(s){return document.querySelector(s)};
+var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
+var pad=function(n){return String(n).padStart(2,'0')};
+var iso=function(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+var parse=function(s){var p=s.split('-').map(Number);return new Date(p[0],p[1]-1,p[2])};
+var addDays=function(s,n){var d=parse(s);d.setDate(d.getDate()+n);return iso(d)};
+var today=function(){return iso(new Date())};
+var diff=function(a,b){return Math.round((parse(a)-parse(b))/86400000)};
+var fmtDate=function(s,o){return parse(s).toLocaleDateString('es-ES',o||{day:'numeric',month:'short',year:'numeric'})};
+var EUR=new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'});
+var money=function(n){return EUR.format(+n||0)};
+var compact=function(v){return v>=1000?(v/1000).toFixed(1).replace('.',',')+' k':String(Math.round(v))};
+var plural=function(n,a,b){return n+' '+(n===1?a:b)};
+function rel(s){var d=diff(s,today());if(d===0)return 'hoy';if(d===1)return 'mañana';if(d===-1)return 'ayer';return d>0?'en '+d+' días':'hace '+(-d)+' días'}
+function parseNum(s){s=String(s||'').trim();if(!s)return 0;var n=s.indexOf(',')>-1?parseFloat(s.replace(/\./g,'').replace(',','.')):parseFloat(s);return isFinite(n)?n:0}
+function monthStart(d){return new Date(d.getFullYear(),d.getMonth(),1)}
+
+/* ---------- estado ---------- */
+var S={
+  tab:'resumen', mode:'conectando', ready:{g:false,c:false},
+  guardias:[], casos:[], cfg:{plazoOficio:120,plazoPrivado:30},
+  month:monthStart(new Date()), selDay:null,
+  fTipo:'todos', fEstado:'todos', q:''
+};
+var refs=null,unsubs=[],idleT=null;
+S.where='cloud';S.key=null;S.locked=true;S.setup=false;S.meta=null;S.recover=false;S.pendingRK=null;
+
+var AREAS=['Penal','Civil','Familia','Laboral','Contencioso','Extranjería','Mercantil','Otro'];
+var plazo=function(t){return t==='oficio'?S.cfg.plazoOficio:S.cfg.plazoPrivado};
+var items=function(){
+  return S.guardias.map(function(g){return Object.assign({},g,{_k:'guardias'})})
+    .concat(S.casos.map(function(c){return Object.assign({},c,{_k:'casos'})}));
+};
+var esperado=function(i){return i.cobroPrevisto||(i.fecha?addDays(i.fecha,plazo(i.tipo)):null)};
+var estado=function(i){if(i.cobrado)return 'cobrado';var e=esperado(i);return e&&e<today()?'retrasado':'pendiente'};
+var sum=function(a){return a.reduce(function(s,i){return s+(+i.importe||0)},0)};
+var tipoLabel=function(t){return t==='oficio'?'Oficio':'Privado'};
+var estadoLabel={pendiente:'Pendiente',retrasado:'Retrasado',cobrado:'Cobrado'};
+var isLoading=function(){return S.mode==='conectando'||(S.mode==='nube'&&!(S.ready.g&&S.ready.c))};
+
+/* ---------- almacenamiento ---------- */
+function toast(msg){
+  var r=$('#toast-root');r.innerHTML='<div class="toast">'+esc(msg)+'</div>';
+  clearTimeout(toast.t);toast.t=setTimeout(function(){r.innerHTML=''},2600);
+}
+function toData(o){var d=Object.assign({},o);delete d.id;delete d._k;return d}
+async function save(kind,obj){
+  try{
+    if(refs){
+      var ref=obj.id?refs[kind].doc(obj.id):refs[kind].doc();
+      await ref.set(await seal(toData(obj)));
+    }else{
+      var arr=S[kind],o=Object.assign({},obj);
+      if(!o.id){o.id='l'+Date.now();arr.push(o)}else{var ix=arr.findIndex(function(x){return x.id===o.id});if(ix>-1)arr[ix]=o}
+      render();
+    }
+    return true;
+  }catch(e){toast('No se pudo guardar. Inténtalo de nuevo.');return false}
+}
+async function removeItem(kind,id){
+  try{
+    if(refs){await refs[kind].doc(id).delete()}
+    else{S[kind]=S[kind].filter(function(x){return x.id!==id});render()}
+    return true;
+  }catch(e){toast('No se pudo eliminar. Inténtalo de nuevo.');return false}
+}
+async function saveCfg(cfg){
+  try{
+    if(refs){await refs.app.update({cfg:await seal(cfg)});S.cfg=cfg;render()}else{S.cfg=cfg;render()}
+    return true;
+  }catch(e){toast('No se pudo guardar los plazos.');return false}
+}
+/* ---------- cifrado (AES-GCM, clave derivada de tu contraseña, solo en este dispositivo) ---------- */
+var TE=new TextEncoder(),TD=new TextDecoder();
+function b64(buf){var a=new Uint8Array(buf),t='';for(var i=0;i<a.length;i++)t+=String.fromCharCode(a[i]);return btoa(t)}
+function unb64(x){var t=atob(x),a=new Uint8Array(t.length);for(var i=0;i<t.length;i++)a[i]=t.charCodeAt(i);return a}
+async function deriveKey(pass,salt,ext){
+  var km=await crypto.subtle.importKey('raw',TE.encode(pass),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:310000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},!!ext,['encrypt','decrypt']);
+}
+function b32(bytes){
+  var A='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567',bits=0,val=0,out='';
+  for(var i=0;i<bytes.length;i++){val=(val<<8)|bytes[i];bits+=8;while(bits>=5){out+=A[(val>>>(bits-5))&31];bits-=5}val&=(1<<bits)-1}
+  if(bits>0)out+=A[(val<<(5-bits))&31];
+  return out;
+}
+async function wrapRaw(kek,raw){
+  var iv=crypto.getRandomValues(new Uint8Array(12));
+  var ct=await crypto.subtle.encrypt({name:'AES-GCM',iv:iv},kek,raw);
+  return {iv:b64(iv),d:b64(ct)};
+}
+async function unwrapRaw(kek,box){return new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(box.iv)},kek,unb64(box.d)))}
+function importDK(raw){return crypto.subtle.importKey('raw',raw,'AES-GCM',true,['encrypt','decrypt'])}
+function normIdent(x){x=String(x||'').trim();return x.indexOf('@')>-1?x.toLowerCase():x.replace(/\D/g,'')}
+function validIdent(x){x=String(x||'').trim();return x.indexOf('@')>-1?/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(x):x.replace(/\D/g,'').length>=9}
+function secretOf(id,pw){return normIdent(id)+'\u0001'+pw}
+function normRK(x){return String(x||'').toUpperCase().replace(/[^A-Z2-7]/g,'')}
+async function makeRecovery(raw){
+  var rk=b32(crypto.getRandomValues(new Uint8Array(20))).match(/.{4}/g).join('-');
+  var salt2=crypto.getRandomValues(new Uint8Array(16));
+  var kek=await deriveKey(normRK(rk),salt2);
+  return {rk:rk,salt2:b64(salt2),wrapRec:await wrapRaw(kek,raw)};
+}
+async function seal(obj){
+  var iv=crypto.getRandomValues(new Uint8Array(12));
+  var ct=await crypto.subtle.encrypt({name:'AES-GCM',iv:iv},S.key,TE.encode(JSON.stringify(obj)));
+  return {v:1,iv:b64(iv),d:b64(ct)};
+}
+async function openBox(box){
+  var pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(box.iv)},S.key,unb64(box.d));
+  return JSON.parse(TD.decode(pt));
+}
+async function decodeDocs(snap){
+  var out=[];
+  for(var i=0;i<snap.docs.length;i++){
+    var x=snap.docs[i];
+    try{out.push(Object.assign({id:x.id},await openBox(x.data())))}catch(e){}
+  }
+  return out;
+}
+
+/* Almacén en este navegador, para quien no tiene sesión de Claude. Solo guarda datos ya cifrados. */
+function localStore(){
+  var KEY='gyc_v1',data={meta:null,guardias:{},casos:{}},subs={guardias:[],casos:[]};
+  try{var raw=localStorage.getItem(KEY);if(raw){var d=JSON.parse(raw);data={meta:d.meta||null,guardias:d.guardias||{},casos:d.casos||{}}}}catch(e){}
+  var persist=function(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){throw new Error('storage')}};
+  var snapOf=function(kind){return {docs:Object.keys(data[kind]).map(function(id){return {id:id,data:function(){return data[kind][id]}}})}};
+  var notify=function(kind){subs[kind].forEach(function(f){f(snapOf(kind))})};
+  function coll(kind){return {
+    doc:function(id){
+      id=id||('l'+Date.now().toString(36)+Math.random().toString(36).slice(2,6));
+      return {id:id,
+        set:async function(d){data[kind][id]=d;persist();notify(kind)},
+        delete:async function(){delete data[kind][id];persist();notify(kind)}};
+    },
+    onSnapshot:function(next){subs[kind].push(next);setTimeout(function(){next(snapOf(kind))},0);return function(){subs[kind]=subs[kind].filter(function(f){return f!==next})}}
+  }}
+  return {
+    app:{
+      get:async function(){return {exists:!!data.meta,data:function(){return data.meta}}},
+      set:async function(m){data.meta=m;persist()},
+      update:async function(u){data.meta=Object.assign({},data.meta,u);persist()}
+    },
+    guardias:coll('guardias'),casos:coll('casos')
+  };
+}
+
+async function connect(){
+  var cl=window.claude;
+  if(!window.crypto||!crypto.subtle){S.mode='local';render();return}
+  try{
+    var db=null,uid=null;
+    if(cl&&cl.use){
+      try{
+        var res=await Promise.all([cl.use('db'),cl.use('user')]);
+        db=res[0];uid=res[1]?await res[1].id():null;
+      }catch(e){db=null;uid=null}
+    }
+    if(db&&uid){
+      var app=db.doc('data/users/'+uid+'/app');
+      refs={app:app,guardias:app.collection('guardias'),casos:app.collection('casos')};
+      S.where='cloud';
+    }else{
+      refs=localStore();S.where='browser';
+    }
+    var snap=await refs.app.get();
+    S.meta=snap.exists?snap.data():{};
+    S.setup=!S.meta.salt;
+    S.mode='nube';S.locked=true;
+    render();
+  }catch(e){S.mode='local';refs=null;render()}
+}
+async function unlock(ident,pass,pass2){
+  var err=$('#lock-err');err.textContent='';
+  if(!validIdent(ident)){err.textContent='Indica un correo válido o un teléfono de al menos 9 cifras.';return}
+  var sec=secretOf(ident,pass),BAD='El correo o teléfono, o la contraseña, no son correctos.';
+  try{
+    if(S.setup){
+      if(pass.length<8){err.textContent='Usa al menos 8 caracteres en la contraseña.';return}
+      if(pass!==pass2){err.textContent='Las dos contraseñas no coinciden.';return}
+      var raw=crypto.getRandomValues(new Uint8Array(32));
+      S.key=await importDK(raw);
+      var salt=crypto.getRandomValues(new Uint8Array(16));
+      var kek=await deriveKey(sec,salt);
+      var rec=await makeRecovery(raw);
+      S.meta={v:2,idv:1,salt:b64(salt),wrapPw:await wrapRaw(kek,raw),salt2:rec.salt2,wrapRec:rec.wrapRec,check:await seal({ok:1}),cfg:await seal(S.cfg)};
+      await refs.app.set(S.meta);
+      S.setup=false;S.pendingRK=rec.rk;
+    }else if(S.meta.wrapPw&&S.meta.idv){
+      var kek2=await deriveKey(sec,unb64(S.meta.salt)),raw2;
+      try{raw2=await unwrapRaw(kek2,S.meta.wrapPw)}catch(e){err.textContent=BAD;return}
+      S.key=await importDK(raw2);
+      try{await openBox(S.meta.check)}catch(e){S.key=null;err.textContent='No se pudo verificar tus datos.';return}
+    }else if(S.meta.wrapPw){
+      var kekOld=await deriveKey(pass,unb64(S.meta.salt)),raw4;
+      try{raw4=await unwrapRaw(kekOld,S.meta.wrapPw)}catch(e){err.textContent='La contraseña no es correcta.';return}
+      S.key=await importDK(raw4);
+      try{await openBox(S.meta.check)}catch(e){S.key=null;err.textContent='No se pudo verificar tus datos.';return}
+      var kekNew=await deriveKey(sec,unb64(S.meta.salt));
+      var up4={idv:1,wrapPw:await wrapRaw(kekNew,raw4)};
+      await refs.app.update(up4);Object.assign(S.meta,up4);
+    }else{
+      var k=await deriveKey(pass,unb64(S.meta.salt),true);
+      S.key=k;
+      try{await openBox(S.meta.check)}catch(e){S.key=null;err.textContent='La contraseña no es correcta.';return}
+      var raw3=new Uint8Array(await crypto.subtle.exportKey('raw',k));
+      var kek3=await deriveKey(sec,unb64(S.meta.salt));
+      var rec3=await makeRecovery(raw3);
+      var up={v:2,idv:1,wrapPw:await wrapRaw(kek3,raw3),salt2:rec3.salt2,wrapRec:rec3.wrapRec};
+      await refs.app.update(up);Object.assign(S.meta,up);S.pendingRK=rec3.rk;
+    }
+    await finish();
+  }catch(e){S.key=null;err.textContent='No se pudo desbloquear. Inténtalo de nuevo.'}
+}
+async function recoverPw(rkIn,ident,p1,p2){
+  var err=$('#lock-err');err.textContent='';
+  var rk=normRK(rkIn);
+  if(rk.length!==32){err.textContent='La clave de recuperación tiene 32 letras y números.';return}
+  if(!validIdent(ident)){err.textContent='Indica un correo válido o un teléfono de al menos 9 cifras.';return}
+  if(p1.length<8){err.textContent='La contraseña nueva necesita al menos 8 caracteres.';return}
+  if(p1!==p2){err.textContent='Las dos contraseñas no coinciden.';return}
+  try{
+    var kek=await deriveKey(rk,unb64(S.meta.salt2)),raw;
+    try{raw=await unwrapRaw(kek,S.meta.wrapRec)}catch(e){err.textContent='Clave de recuperación incorrecta.';return}
+    S.key=await importDK(raw);
+    try{await openBox(S.meta.check)}catch(e){S.key=null;err.textContent='No se pudo verificar tus datos.';return}
+    var salt=crypto.getRandomValues(new Uint8Array(16));
+    var kekPw=await deriveKey(secretOf(ident,p1),salt);
+    var rec=await makeRecovery(raw);
+    var up={v:2,idv:1,salt:b64(salt),wrapPw:await wrapRaw(kekPw,raw),salt2:rec.salt2,wrapRec:rec.wrapRec};
+    await refs.app.update(up);Object.assign(S.meta,up);
+    S.recover=false;S.pendingRK=rec.rk;
+    await finish();
+  }catch(e){S.key=null;err.textContent='No se pudo completar la recuperación. Inténtalo de nuevo.'}
+}
+async function finish(){
+  if(S.meta&&S.meta.cfg){try{var c=await openBox(S.meta.cfg);if(c&&typeof c.plazoOficio==='number'){S.cfg.plazoOficio=c.plazoOficio;S.cfg.plazoPrivado=c.plazoPrivado}}catch(e){}}
+  S.locked=false;S.ready={g:false,c:false};
+  var onErr=function(){lock()};
+  unsubs.push(refs.guardias.onSnapshot(async function(sn){S.guardias=await decodeDocs(sn);S.ready.g=true;render()},onErr));
+  unsubs.push(refs.casos.onSnapshot(async function(sn){S.casos=await decodeDocs(sn);S.ready.c=true;render()},onErr));
+  startIdle();render();
+}
+function lock(){
+  unsubs.forEach(function(u){try{u()}catch(e){}});unsubs=[];
+  S.key=null;S.locked=true;S.recover=false;S.authTab=null;S.pendingRK=null;S.guardias=[];S.casos=[];S.ready={g:false,c:false};
+  clearTimeout(idleT);closeSheet();render();
+}
+function startIdle(){
+  clearTimeout(idleT);
+  idleT=setTimeout(function(){if(S.mode==='nube'&&!S.locked&&!S.pendingRK){lock();toast('Bloqueado por inactividad')}},10*60*1000);
+}
+['click','keydown','touchstart'].forEach(function(n){document.addEventListener(n,function(){if(S.mode==='nube'&&!S.locked)startIdle()},{passive:true})});
+
+function lockView(){
+  var setup=S.setup,first=!setup&&S.meta&&!S.meta.idv;
+  if(S.recover){
+    return '<section class="card pad lockbox"><h2 class="lock-h">Recuperar el acceso</h2>'+
+     '<p class="muted">Escribe la clave de recuperación que guardaste, indica el correo o teléfono con el que quieres entrar y elige una contraseña nueva. Tus datos no se pierden. Al terminar recibirás una clave de recuperación nueva y la anterior dejará de valer.</p>'+
+     '<form id="recover-form" class="lock-form" novalidate>'+
+     '<div class="field"><label for="rk0">Clave de recuperación</label><input type="text" id="rk0" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"></div>'+
+     '<div class="field"><label for="rkid">Correo electrónico o teléfono</label><input type="text" id="rkid" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false"></div>'+
+     '<div class="field"><label for="rk1">Contraseña nueva</label><input type="password" id="rk1" autocomplete="new-password"></div>'+
+     '<div class="field"><label for="rk2">Repite la contraseña</label><input type="password" id="rk2" autocomplete="new-password"></div>'+
+     '<p class="err" id="lock-err" role="alert"></p>'+
+     '<button type="submit" class="btn primary">Cambiar contraseña y entrar</button>'+
+     '<button type="button" class="btn ghost" data-action="back-lock">Volver</button></form></section>';
+  }
+  var ctx=S.where==='browser'?'este navegador':'esta cuenta';
+  var cur=S.authTab||(setup?'signup':'login');
+  var tabs='<div class="seg authseg" role="group" aria-label="Acceso">'+[['login','Iniciar sesión'],['signup','Registrarse']].map(function(t){return '<button type="button" data-action="auth-tab" data-v="'+t[0]+'" aria-pressed="'+(cur===t[0])+'">'+t[1]+'</button>'}).join('')+'</div>';
+  if(cur==='signup'&&!setup){
+    return '<section class="card pad lockbox">'+tabs+'<h2 class="lock-h">Ya tienes un acceso</h2>'+
+     '<p class="muted">En '+ctx+' ya hay un acceso creado y tus datos están cifrados con él. Si te registraras otra vez, perderías el acceso a lo que ya has guardado. Inicia sesión con tu correo o teléfono y tu contraseña.</p>'+
+     '<button type="button" class="btn primary" style="margin-top:14px" data-action="auth-tab" data-v="login">Ir a iniciar sesión</button></section>';
+  }
+  if(cur==='login'&&setup){
+    return '<section class="card pad lockbox">'+tabs+'<h2 class="lock-h">Todavía no tienes acceso</h2>'+
+     '<p class="muted">Aún no has creado un acceso en '+ctx+'. Regístrate con un correo o teléfono y una contraseña y después podrás iniciar sesión cuando quieras.</p>'+
+     '<button type="button" class="btn primary" style="margin-top:14px" data-action="auth-tab" data-v="signup">Ir a registrarse</button></section>';
+  }
+  return '<section class="card pad lockbox">'+tabs+'<h2 class="lock-h">'+(setup?'Regístrate':'Iniciar sesión')+'</h2>'+
+   '<p class="muted">'+(setup?'Elige un correo o teléfono y una contraseña. Todo lo que registres se cifra en este dispositivo antes de guardarse, así que sin los dos nadie puede leerlo. Después te daré una clave de recuperación por si los olvidas.':first?'Desde ahora entrarás con un correo o teléfono y tu contraseña. Indica el que quieres usar y tu contraseña actual.':'Introduce tu correo o teléfono y tu contraseña para ver tus guardias y casos.')+'</p>'+
+   '<form id="lock-form" class="lock-form" novalidate>'+
+   '<div class="field"><label for="lk0">Correo electrónico o teléfono</label><input type="text" id="lk0" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="nombre@correo.com o 600 000 000"><p class="hint">Se usa junto con la contraseña para proteger tus datos en este dispositivo. No se envía ningún código ni mensaje.</p></div>'+
+   '<div class="field"><label for="lk1">'+(setup?'Contraseña nueva':'Contraseña')+'</label><input type="password" id="lk1" autocomplete="'+(setup?'new-password':'current-password')+'"></div>'+
+   (setup?'<div class="field"><label for="lk2">Repite la contraseña</label><input type="password" id="lk2" autocomplete="new-password"></div>':'')+
+   '<p class="err" id="lock-err" role="alert"></p>'+
+   '<button type="submit" class="btn primary">'+(setup?'Registrarme y entrar':'Entrar')+'</button>'+
+   (!setup&&S.meta&&S.meta.wrapRec?'<button type="button" class="btn ghost" data-action="forgot">He olvidado mis datos de acceso</button>':'')+
+   '</form>'+(S.where==='browser'?'<p class="note" style="margin-top:14px">Tus datos se guardan cifrados solo en este navegador. No se sincronizan con otros dispositivos y se perderían si borras los datos del navegador.</p>':'')+'</section>';
+}
+function rkView(){
+  return '<section class="card pad lockbox"><h2 class="lock-h">Guarda tu clave de recuperación</h2>'+
+   '<p class="muted">Es la única forma de volver a entrar si olvidas la contraseña. Solo se muestra ahora. Guárdala fuera de esta página, en un gestor de contraseñas o impresa en un lugar seguro. Quien tenga esta clave puede abrir tus datos, así que no la compartas.</p>'+
+   '<p class="rk mono" id="rk-text">'+esc(S.pendingRK)+'</p>'+
+   '<div class="rk-actions"><button type="button" class="btn" data-action="copy-rk">Copiar la clave</button></div>'+
+   '<label class="check"><input type="checkbox" id="rk-ok"> Ya la he guardado en un lugar seguro</label>'+
+   '<p class="hint" style="margin:6px 0 14px">Si pierdes la contraseña y esta clave, nadie puede recuperar los datos.</p>'+
+   '<button type="button" class="btn primary" id="rk-done" data-action="rk-done" disabled>Continuar</button></section>';
+}
+
+/* ---------- componentes ---------- */
+function row(i,opts){
+  opts=opts||{};
+  var g=i._k==='guardias',st=estado(i),e=esperado(i);
+  var title=g?(i.lugar||'Guardia sin lugar'):(i.titulo||'Caso sin nombre');
+  var meta=['<span class="chip '+esc(i.tipo)+'">'+tipoLabel(i.tipo)+'</span>',g?'Guardia':'Caso'];
+  if(!g&&i.ref)meta.push('Exp. '+esc(i.ref));
+  if(!g&&i.area)meta.push(esc(i.area));
+  if(!g&&i.estado==='cerrado')meta.push('Cerrado');
+  var pay='';
+  if(i.cobrado){pay='Cobrado el '+fmtDate(i.fechaCobro||i.fecha)}
+  else if(e){pay='Cobro '+(i.cobroPrevisto?'previsto':'estimado')+' el '+fmtDate(e)+' ('+rel(e)+')'}
+  var d=parse(i.fecha||today());
+  var act=opts.noActions?'':
+    '<div class="row-actions">'+
+    '<button type="button" class="btn sm" data-action="toggle-cobro" data-k="'+i._k+'" data-id="'+esc(i.id)+'">'+(i.cobrado?'Deshacer cobro':'Marcar cobrado')+'</button>'+
+    '<button type="button" class="btn sm ghost" data-action="edit" data-k="'+i._k+'" data-id="'+esc(i.id)+'">Editar</button></div>';
+  return '<article class="row">'+
+    '<div class="datebox" aria-hidden="true"><b>'+d.getDate()+'</b><span>'+d.toLocaleDateString('es-ES',{month:'short'}).replace('.','')+'</span></div>'+
+    '<div><p class="row-title">'+esc(title)+'</p><div class="row-meta">'+meta.join('<span aria-hidden="true">·</span>')+'</div>'+(pay?'<p class="row-pay">'+pay+'</p>':'')+'</div>'+
+    '<div class="row-side"><span class="amount">'+(+i.importe&&i.cobrado?money(i.importe):'')+'</span><span class="pill '+st+'">'+estadoLabel[st]+'</span></div>'+
+    act+'</article>';
+}
+function emptyAll(){
+  return '<section class="card empty"><h3>Aquí verás cuándo te pagan</h3>'+
+    '<p>Registra tus guardias y tus casos. La app calcula la fecha de cobro estimada y marca lo que va retrasado. El importe lo indicas cuando te pagan.</p>'+
+    '<div class="btns"><button type="button" class="btn primary" data-action="new-guardia">Añadir una guardia</button>'+
+    '<button type="button" class="btn" data-action="new-caso">Añadir un caso</button></div></section>';
+}
+function modeNote(){
+  if(S.mode==='local')return '<p class="note">Esta vista no puede cifrar ni guardar datos, así que lo que añadas solo dura mientras la página siga abierta.</p>';
+  if(S.where==='browser')return '<p class="note">Tus datos se guardan cifrados solo en este navegador. No se sincronizan con otros dispositivos y se perderían si borras los datos del navegador. Usa Exportar a CSV para tener una copia.</p>';
+  return '';
+}
+
+/* ---------- vistas ---------- */
+function vResumen(){
+  var all=items();
+  if(!all.length)return modeNote()+emptyAll();
+  var T=today(),pend=all.filter(function(i){return !i.cobrado});
+  var retr=pend.filter(function(i){return estado(i)==='retrasado'});
+  var prox=pend.filter(function(i){var e=esperado(i);return e>=T&&e<=addDays(T,30)});
+  var year=T.slice(0,4);
+  var cobY=all.filter(function(i){return i.cobrado&&(i.fechaCobro||i.fecha||'').slice(0,4)===year});
+
+  var now=new Date(),buckets=[{l:'Atrasado',v:0,c:'late'}],keys=[];
+  for(var k=0;k<6;k++){
+    var m=new Date(now.getFullYear(),now.getMonth()+k,1);
+    keys.push(m.getFullYear()+'-'+pad(m.getMonth()+1));
+    buckets.push({l:m.toLocaleDateString('es-ES',{month:'short'}).replace('.',''),v:0,c:''});
+  }
+  buckets.push({l:'Después',v:0,c:'later'});
+  pend.forEach(function(i){
+    var e=esperado(i);if(!e)return;var amt=1;
+    if(e<T){buckets[0].v+=amt;return}
+    var ix=keys.indexOf(e.slice(0,7));
+    if(ix>-1)buckets[ix+1].v+=amt;else buckets[7].v+=amt;
+  });
+  var max=Math.max.apply(null,buckets.map(function(b){return b.v}).concat([1]));
+
+  var chart=buckets.map(function(b){
+    var h=b.v?Math.max(4,b.v/max*100):0;
+    return '<div class="col"><span class="val">'+(b.v?compact(b.v):'')+'</span><div class="well"><div class="bar '+(b.v?b.c:'zero')+'" style="height:'+(b.v?h:2)+'%"></div></div><span class="lab">'+esc(b.l)+'</span></div>';
+  }).join('');
+
+  var nextPay=pend.filter(function(i){return esperado(i)}).sort(function(a,b){return esperado(a)<esperado(b)?-1:1}).slice(0,6);
+  var nextG=S.guardias.filter(function(g){return g.fecha>=T}).sort(function(a,b){return a.fecha<b.fecha?-1:1}).slice(0,4).map(function(g){return Object.assign({},g,{_k:'guardias'})});
+
+  return modeNote()+
+  '<div class="grid two">'+
+   '<div class="stack">'+
+    '<section class="card hero"><p class="eyebrow">Pendiente de cobro</p><p class="big">'+pend.length+'</p>'+
+     '<p class="muted">'+(pend.length===1?'partida sin cobrar':'partidas sin cobrar')+'</p>'+
+     '<dl class="stats">'+
+      '<div><dt>Retrasado</dt><dd class="'+(retr.length?'bad':'')+'">'+retr.length+'</dd></div>'+
+      '<div><dt>Próximos 30 días</dt><dd>'+prox.length+'</dd></div>'+
+      '<div><dt>Cobrado en '+year+'</dt><dd class="ok">'+money(sum(cobY))+'</dd></div>'+
+     '</dl></section>'+
+    '<section class="card"><h2 class="card-title">Cobros previstos por mes</h2><p class="card-sub">Partidas pendientes según su fecha de cobro estimada.</p>'+
+     '<div class="chart" role="img" aria-label="Partidas pendientes por mes de cobro estimado">'+chart+'</div></section>'+
+   '</div>'+
+   '<div class="stack">'+
+    '<section class="card"><h2 class="card-title">Próximos cobros</h2><p class="card-sub">Lo primero que debería llegar.</p>'+
+     (nextPay.length?'<div class="list">'+nextPay.map(function(i){return row(i,{noActions:true})}).join('')+'</div>':'<p class="empty">Todo está cobrado.</p>')+'</section>'+
+    '<section class="card"><h2 class="card-title">Próximas guardias</h2><p class="card-sub">Desde hoy en adelante.</p>'+
+     (nextG.length?'<div class="list">'+nextG.map(function(i){return row(i,{noActions:true})}).join('')+'</div>':'<p class="empty">No hay guardias futuras registradas.</p>')+'</section>'+
+   '</div>'+
+  '</div>'+
+  '<div class="bottom-tools"><button type="button" class="btn" data-action="export">Exportar a CSV</button></div>';
+}
+
+function vGuardias(){
+  var y=S.month.getFullYear(),m=S.month.getMonth(),T=today();
+  var days=new Date(y,m+1,0).getDate(),off=(new Date(y,m,1).getDay()+6)%7;
+  var by={};
+  S.guardias.forEach(function(g){(by[g.fecha]=by[g.fecha]||[]).push(g)});
+  var cells='';
+  ['L','M','X','J','V','S','D'].forEach(function(w){cells+='<div class="dow">'+w+'</div>'});
+  for(var b=0;b<off;b++)cells+='<div class="day blank" aria-hidden="true"></div>';
+  for(var d=1;d<=days;d++){
+    var s=y+'-'+pad(m+1)+'-'+pad(d),list=by[s]||[];
+    var dots=list.slice(0,4).map(function(g){return '<span class="dot '+esc(g.tipo)+(g.cobrado?' paid':'')+'"></span>'}).join('');
+    var lbl=parse(s).toLocaleDateString('es-ES',{day:'numeric',month:'long'})+(list.length?', '+plural(list.length,'guardia','guardias'):'');
+    cells+='<button type="button" class="day'+(s===T?' today':'')+(s===S.selDay?' sel':'')+'" data-action="pick-day" data-date="'+s+'" aria-label="'+esc(lbl)+'"><b>'+d+'</b><span class="dots">'+dots+'</span></button>';
+  }
+  var title=S.month.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+  var monthKey=y+'-'+pad(m+1);
+  var inMonth=S.guardias.filter(function(g){return (g.fecha||'').slice(0,7)===monthKey}).sort(function(a,b){return a.fecha<b.fecha?-1:1}).map(function(g){return Object.assign({},g,{_k:'guardias'})});
+
+  var dayPanel='';
+  if(S.selDay){
+    var ds=(by[S.selDay]||[]).map(function(g){return Object.assign({},g,{_k:'guardias'})});
+    dayPanel='<section class="card"><div class="dayhead"><h3>'+esc(fmtDate(S.selDay,{weekday:'long',day:'numeric',month:'long'}))+'</h3>'+
+      '<button type="button" class="btn sm primary" data-action="new-guardia" data-date="'+S.selDay+'">Añadir guardia este día</button></div>'+
+      (ds.length?'<div class="list">'+ds.map(function(i){return row(i)}).join('')+'</div>':'<p class="empty" style="padding-top:0">Sin guardias este día.</p>')+'</section>';
+  }
+  return modeNote()+
+   '<div class="sec-head"><h2>Guardias</h2><button type="button" class="btn primary" data-action="new-guardia">Nueva guardia</button></div>'+
+   '<div class="grid two"><div class="stack">'+
+    '<section class="card"><div class="cal-head"><button type="button" class="icon" data-action="prev-month" aria-label="Mes anterior">‹</button>'+
+     '<h3>'+esc(title)+'</h3><button type="button" class="icon" data-action="next-month" aria-label="Mes siguiente">›</button></div>'+
+     '<div class="cal">'+cells+'</div>'+
+     '<div class="legend"><span><i class="dot"></i>Oficio</span><span><i class="dot privado"></i>Privado</span><span>Los puntos claros ya están cobrados</span>'+
+     '<button type="button" class="btn sm ghost" data-action="today-month">Ir a hoy</button></div></section>'+
+    dayPanel+
+   '</div><section class="card"><h2 class="card-title">Guardias de '+esc(S.month.toLocaleDateString('es-ES',{month:'long'}))+'</h2>'+
+    '<p class="card-sub">'+plural(inMonth.length,'guardia','guardias')+(sum(inMonth.filter(function(i){return i.cobrado}))?' · cobrado '+money(sum(inMonth.filter(function(i){return i.cobrado}))):'')+'</p>'+
+    (inMonth.length?'<div class="list">'+inMonth.map(function(i){return row(i)}).join('')+'</div>':'<p class="empty">Toca un día del calendario para añadir una guardia.</p>')+'</section></div>';
+}
+
+function filteredCasos(){
+  var q=S.q.trim().toLowerCase();
+  return S.casos.map(function(c){return Object.assign({},c,{_k:'casos'})}).filter(function(c){
+    if(S.fTipo!=='todos'&&c.tipo!==S.fTipo)return false;
+    if(S.fEstado==='porcobrar'&&c.cobrado)return false;
+    if(S.fEstado==='cobrados'&&!c.cobrado)return false;
+    if(q&&[c.titulo,c.ref,c.area,c.notas].join(' ').toLowerCase().indexOf(q)<0)return false;
+    return true;
+  }).sort(function(a,b){return (a.fecha||'')<(b.fecha||'')?1:-1});
+}
+function casosList(){
+  var list=filteredCasos();
+  if(!S.casos.length)return '<section class="card empty"><h3>Aún no hay casos</h3><p>Añade cada caso de oficio o privado y la app te dirá cuándo debería llegar el pago.</p><div class="btns"><button type="button" class="btn primary" data-action="new-caso">Añadir un caso</button></div></section>';
+  if(!list.length)return '<section class="card empty"><p>Ningún caso coincide con los filtros.</p></section>';
+  return '<section class="card"><p class="card-sub" style="padding-top:14px">'+plural(list.length,'caso','casos')+(sum(list.filter(function(i){return i.cobrado}))?' · cobrado '+money(sum(list.filter(function(i){return i.cobrado}))):'')+'</p><div class="list">'+list.map(function(i){return row(i)}).join('')+'</div></section>';
+}
+function vCasos(){
+  var seg=function(name,opts,cur){return '<div class="seg" role="group">'+opts.map(function(o){return '<button type="button" data-action="'+name+'" data-v="'+o[0]+'" aria-pressed="'+(cur===o[0])+'">'+o[1]+'</button>'}).join('')+'</div>'};
+  return modeNote()+
+   '<div class="sec-head"><h2>Casos</h2><button type="button" class="btn primary" data-action="new-caso">Nuevo caso</button></div>'+
+   '<div class="filters">'+seg('f-tipo',[['todos','Todos'],['oficio','Oficio'],['privado','Privados']],S.fTipo)+
+   seg('f-estado',[['todos','Todos'],['porcobrar','Por cobrar'],['cobrados','Cobrados']],S.fEstado)+
+   '<div class="field search"><label for="q" class="sr" style="position:absolute;left:-9999px">Buscar</label><input type="text" id="q" placeholder="Buscar por cliente, expediente o área" value="'+esc(S.q)+'" autocomplete="off"></div></div>'+
+   '<div id="lista">'+casosList()+'</div>';
+}
+
+function render(){
+  var st=$('#sync');
+  if(S.mode==='nube'&&S.locked){st.className='sync';st.innerHTML='<i></i><span>Bloqueado</span>'}
+  else if(S.mode==='nube'){st.className='sync ok';st.innerHTML='<i></i><span>'+(S.where==='browser'?'Cifrado en este navegador':'Cifrado y guardado')+'</span>'}
+  else if(S.mode==='local'){st.className='sync warn';st.innerHTML='<i></i><span>Sin conexión a tu cuenta</span>'}
+  else{st.className='sync';st.innerHTML='<i></i><span>Conectando</span>'}
+  var gate=S.mode==='nube'&&(S.locked||!!S.pendingRK);
+  var lk=$('#lockbtn');if(lk)lk.hidden=gate||S.mode!=='nube';
+  var tn=$('#tabs');if(tn)tn.hidden=gate;
+  if(gate){$('#view').innerHTML=S.locked?lockView():rkView();return}
+  var tabs=[['resumen','Resumen',''],['guardias','Guardias',S.guardias.length],['casos','Casos',S.casos.length]];
+  $('#tabs').innerHTML=tabs.map(function(t){
+    return '<button type="button" class="tab" data-action="tab" data-v="'+t[0]+'"'+(S.tab===t[0]?' aria-current="page"':'')+'>'+t[1]+(t[2]!==''&&t[2]>0?'<small>'+t[2]+'</small>':'')+'</button>';
+  }).join('');
+  var v=$('#view');
+  if(isLoading()){v.innerHTML='<section class="card empty"><p>Cargando tus datos…</p></section>';return}
+  var focus=document.activeElement&&document.activeElement.id==='q';
+  v.innerHTML=S.tab==='guardias'?vGuardias():S.tab==='casos'?vCasos():vResumen();
+  if(focus&&$('#q')){var q=$('#q');q.focus();q.setSelectionRange(q.value.length,q.value.length)}
+}
+
+/* ---------- hoja de edición ---------- */
+var editing=null;
+function field(id,label,inner,hint){return '<div class="field"><label for="'+id+'">'+label+'</label>'+inner+(hint?'<p class="hint">'+hint+'</p>':'')+'</div>'}
+function opt(v,l,cur){return '<option value="'+esc(v)+'"'+(v===cur?' selected':'')+'>'+esc(l)+'</option>'}
+function openSheet(html,title,key){
+  $('#sheet-root').innerHTML='<div class="overlay" data-action="close-sheet"></div><form class="sheet" id="sheet-form" data-form="'+key+'" role="dialog" aria-modal="true" aria-labelledby="sheet-t" novalidate>'+
+   '<header><h2 id="sheet-t">'+esc(title)+'</h2><button type="button" class="icon" data-action="close-sheet" aria-label="Cerrar">×</button></header>'+html+'</form>';
+  document.documentElement.classList.add('lock');
+  var f=$('#sheet-form input:not([type=checkbox]),#sheet-form select');if(f)f.focus();
+}
+function closeSheet(){$('#sheet-root').innerHTML='';document.documentElement.classList.remove('lock');editing=null}
+function payFields(o){
+  var ps=plazo(o.tipo||'oficio');
+  return '<p class="hint">La fecha de cobro se calcula sola con tus plazos (<span id="plazo-txt">'+ps+'</span> días para este tipo). Puedes cambiarlos en Plazos.</p>'+
+   '<label class="check"><input type="checkbox" id="f-cobrado"'+(o.cobrado?' checked':'')+'> Ya está cobrado</label>'+
+   '<div id="cobro-box"'+(o.cobrado?'':' hidden')+'><div class="two-col">'+
+    field('f-importe','Importe cobrado (€)','<input type="text" id="f-importe" inputmode="decimal" autocomplete="off" value="'+esc(o.importe?String(o.importe).replace('.',','):'')+'" placeholder="0,00">')+
+    field('f-fcobro','Fecha de cobro','<input type="date" id="f-fcobro" value="'+esc(o.fechaCobro||'')+'">')+'</div></div>'+
+   field('f-notas','Notas','<textarea id="f-notas" placeholder="Número de justificante, juzgado, observaciones…">'+esc(o.notas||'')+'</textarea>');
+}
+function footer(isEdit){
+  return '<footer><div class="grp">'+(isEdit?'<button type="button" class="btn danger" data-action="del-ask" id="del-ask">Eliminar</button><span id="del-confirm" hidden class="grp"><button type="button" class="btn danger" data-action="del-do">Sí, eliminar</button><button type="button" class="btn" data-action="del-cancel">Cancelar</button></span>':'')+'</div>'+
+   '<div class="grp"><span class="err" id="form-err" role="alert"></span><button type="button" class="btn" data-action="close-sheet">Cancelar</button><button type="submit" class="btn primary">Guardar</button></div></footer>';
+}
+function tipoSelect(cur){return field('f-tipo','Tipo','<select id="f-tipo">'+opt('oficio','Turno de oficio',cur)+opt('privado','Privado',cur)+'</select>')}
+function openGuardia(id,preDate){
+  var o=id?S.guardias.find(function(x){return x.id===id}):null;
+  editing={k:'guardias',id:id||null,base:o};
+  o=o||{fecha:preDate||S.selDay||today(),tipo:'oficio'};
+  openSheet('<div class="fields">'+
+    '<div class="two-col">'+field('f-fecha','Fecha de la guardia','<input type="date" id="f-fecha" value="'+esc(o.fecha)+'" required>')+tipoSelect(o.tipo)+'</div>'+
+    field('f-lugar','Lugar o turno','<input type="text" id="f-lugar" value="'+esc(o.lugar||'')+'" placeholder="Ej. Juzgados de guardia, comisaría, turno penal" autocomplete="off">')+
+    payFields(o)+'</div>'+footer(!!id),
+    id?'Editar guardia':'Nueva guardia','guardia');
+}
+function openCaso(id){
+  var o=id?S.casos.find(function(x){return x.id===id}):null;
+  editing={k:'casos',id:id||null,base:o};
+  o=o||{fecha:today(),tipo:'oficio',estado:'curso',area:''};
+  openSheet('<div class="fields">'+
+    field('f-titulo','Cliente o asunto','<input type="text" id="f-titulo" value="'+esc(o.titulo||'')+'" placeholder="Ej. Cliente García, divorcio" autocomplete="off" required>')+
+    '<div class="two-col">'+tipoSelect(o.tipo)+field('f-ref','Nº de expediente','<input type="text" id="f-ref" value="'+esc(o.ref||'')+'" autocomplete="off">')+'</div>'+
+    '<div class="two-col">'+field('f-area','Área','<select id="f-area">'+opt('','Sin indicar',o.area||'')+AREAS.map(function(a){return opt(a,a,o.area||'')}).join('')+'</select>')+
+     field('f-estado','Estado del caso','<select id="f-estado">'+opt('curso','En curso',o.estado)+opt('cerrado','Cerrado',o.estado)+'</select>')+'</div>'+
+    field('f-fecha','Fecha de la actuación','<input type="date" id="f-fecha" value="'+esc(o.fecha||'')+'">','Desde esta fecha se cuenta el plazo de cobro.')+
+    payFields(o)+'</div>'+footer(!!id),
+    id?'Editar caso':'Nuevo caso','caso');
+}
+function openCobro(k,id){
+  var o=S[k].find(function(x){return x.id===id});if(!o)return;
+  editing={k:k,id:id,base:o};
+  openSheet('<div class="fields"><p class="muted">'+esc(k==='guardias'?(o.lugar||'Guardia'):(o.titulo||'Caso'))+'</p><div class="two-col">'+
+    field('f-importe','Importe cobrado (€)','<input type="text" id="f-importe" inputmode="decimal" autocomplete="off" value="'+esc(o.importe?String(o.importe).replace('.',','):'')+'" placeholder="0,00">')+
+    field('f-fcobro','Fecha de cobro','<input type="date" id="f-fcobro" value="'+today()+'">')+'</div></div>'+footer(false),
+    '¿Cuánto te han pagado?','cobro');
+}
+function openSettings(){
+  if(S.mode==='nube'&&S.locked)return;
+  editing=null;
+  openSheet('<div class="fields"><p class="muted">Cuando no indicas una fecha de cobro, se calcula sumando estos días a la fecha de la guardia o de la actuación. Ajústalos a lo que tarda en pagarte el Colegio o cada cliente.</p>'+
+    '<div class="two-col">'+field('s-oficio','Oficio (días)','<input type="number" id="s-oficio" min="0" max="730" step="1" value="'+S.cfg.plazoOficio+'">')+
+    field('s-privado','Privado (días)','<input type="number" id="s-privado" min="0" max="730" step="1" value="'+S.cfg.plazoPrivado+'">')+'</div></div>'+
+    '<footer><div class="grp"></div><div class="grp"><span class="err" id="form-err" role="alert"></span><button type="button" class="btn" data-action="close-sheet">Cancelar</button><button type="submit" class="btn primary">Guardar</button></div></footer>',
+    'Plazos de cobro','settings');
+}
+
+async function submitForm(form){
+  var kind=form.getAttribute('data-form'),err=$('#form-err');
+  var v=function(id){var e=document.getElementById(id);return e?e.value.trim():''};
+  if(kind==='settings'){
+    var a=parseInt(v('s-oficio'),10),b=parseInt(v('s-privado'),10);
+    if(!(a>=0&&a<=730&&b>=0&&b<=730)){err.textContent='Indica días entre 0 y 730.';return}
+    if(await saveCfg({plazoOficio:a,plazoPrivado:b})){closeSheet();toast('Plazos guardados')}
+    return;
+  }
+  if(kind==='cobro'){
+    var imp=parseNum(v('f-importe'));
+    if(!imp){err.textContent='Indica cuánto te han pagado.';return}
+    var nc=Object.assign({},editing.base,{cobrado:true,importe:imp,fechaCobro:v('f-fcobro')||today()});
+    if(await save(editing.k,nc)){closeSheet();toast('Marcado como cobrado')}
+    return;
+  }
+  var fecha=v('f-fecha');
+  if(kind==='guardia'&&!fecha){err.textContent='Indica la fecha de la guardia.';return}
+  if(kind==='caso'&&!v('f-titulo')){err.textContent='Indica el cliente o el asunto.';return}
+  if(document.getElementById('f-cobrado').checked&&!parseNum(v('f-importe'))){err.textContent='Indica cuánto te han pagado.';return}
+  var cobrado=document.getElementById('f-cobrado').checked;
+  var o=Object.assign({},editing.base||{},{
+    fecha:fecha||null,tipo:v('f-tipo'),importe:parseNum(v('f-importe')),
+    cobrado:cobrado,fechaCobro:cobrado?(v('f-fcobro')||today()):null,notas:v('f-notas')
+  });
+  if(kind==='guardia')o.lugar=v('f-lugar');
+  else{o.titulo=v('f-titulo');o.ref=v('f-ref');o.area=v('f-area');o.estado=v('f-estado')}
+  if(editing.id)o.id=editing.id;else o.creado=new Date().toISOString();
+  if(await save(editing.k,o)){
+    if(kind==='guardia'&&o.fecha){S.month=monthStart(parse(o.fecha));S.selDay=o.fecha}
+    closeSheet();render();toast('Guardado');
+  }
+}
+
+/* ---------- exportar ---------- */
+function csvCell(x){
+  var s=String(x==null?'':x);
+  if(/^[=+\-@]/.test(s))s="'"+s;
+  return '"'+s.replace(/"/g,'""')+'"';
+}
+async function exportCsv(){
+  var head=['Registro','Fecha','Tipo','Cliente o lugar','Expediente','Área','Importe','Cobro previsto o estimado','Estado','Fecha de cobro','Notas'];
+  var rows=items().sort(function(a,b){return (a.fecha||'')<(b.fecha||'')?-1:1}).map(function(i){
+    var g=i._k==='guardias';
+    return [g?'Guardia':'Caso',i.fecha||'',tipoLabel(i.tipo),g?(i.lugar||''):(i.titulo||''),i.ref||'',i.area||'',(i.importe?String(i.importe).replace('.',','):''),esperado(i)||'',estadoLabel[estado(i)],i.fechaCobro||'',i.notas||''].map(csvCell).join(';');
+  });
+  var text='\ufeff'+head.map(csvCell).join(';')+'\r\n'+rows.join('\r\n');
+  var cl=window.claude,dl=null;
+  try{dl=cl&&cl.use?await cl.use('downloads'):null}catch(e){dl=null}
+  if(dl){
+    try{await dl.save({filename:'guardias-y-cobros.csv',data:text})}catch(e){if(!e||e.code!=='declined')toast('No se pudo preparar el archivo.')}
+    return;
+  }
+  try{
+    var blob=new Blob([text],{type:'text/csv;charset=utf-8'});
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='guardias-y-cobros.csv';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(a.href)},1500);
+  }catch(e){toast('No se pudo preparar el archivo.')}
+}
+
+/* ---------- eventos ---------- */
+document.addEventListener('click',async function(ev){
+  var el=ev.target.closest('[data-action]');if(!el)return;
+  var a=el.getAttribute('data-action'),v=el.getAttribute('data-v');
+  switch(a){
+    case 'tab':S.tab=v;render();window.scrollTo(0,0);break;
+    case 'prev-month':S.month=new Date(S.month.getFullYear(),S.month.getMonth()-1,1);S.selDay=null;render();break;
+    case 'next-month':S.month=new Date(S.month.getFullYear(),S.month.getMonth()+1,1);S.selDay=null;render();break;
+    case 'today-month':S.month=monthStart(new Date());S.selDay=today();render();break;
+    case 'pick-day':S.selDay=el.getAttribute('data-date')===S.selDay?null:el.getAttribute('data-date');render();break;
+    case 'new-guardia':openGuardia(null,el.getAttribute('data-date'));break;
+    case 'new-caso':S.tab==='casos'||(S.tab='casos',render());openCaso(null);break;
+    case 'edit':el.getAttribute('data-k')==='guardias'?openGuardia(el.getAttribute('data-id')):openCaso(el.getAttribute('data-id'));break;
+    case 'toggle-cobro':{
+      var k=el.getAttribute('data-k'),id=el.getAttribute('data-id');
+      var o=S[k].find(function(x){return x.id===id});if(!o)break;
+      if(!o.cobrado){openCobro(k,id);break}
+      var n=Object.assign({},o,{cobrado:false,fechaCobro:null});
+      el.disabled=true;
+      if(await save(k,n))toast(n.cobrado?'Marcado como cobrado':'Cobro deshecho');
+      break;
+    }
+    case 'close-sheet':closeSheet();break;
+    case 'lock':lock();break;
+    case 'auth-tab':S.authTab=v;render();break;
+    case 'forgot':S.recover=true;render();break;
+    case 'back-lock':S.recover=false;render();break;
+    case 'copy-rk':
+      try{await navigator.clipboard.writeText(S.pendingRK);toast('Clave copiada')}
+      catch(e){var r=document.createRange();r.selectNodeContents($('#rk-text'));var sl=getSelection();sl.removeAllRanges();sl.addRange(r);toast('Selecciónala y cópiala')}
+      break;
+    case 'rk-done':S.pendingRK=null;render();break;
+    case 'settings':openSettings();break;
+    case 'export':exportCsv();break;
+    case 'f-tipo':S.fTipo=v;render();break;
+    case 'f-estado':S.fEstado=v;render();break;
+    case 'del-ask':$('#del-ask').hidden=true;$('#del-confirm').hidden=false;break;
+    case 'del-cancel':$('#del-confirm').hidden=true;$('#del-ask').hidden=false;break;
+    case 'del-do':
+      if(editing&&editing.id&&await removeItem(editing.k,editing.id)){closeSheet();render();toast('Eliminado')}
+      break;
+  }
+});
+document.addEventListener('submit',function(ev){
+  if(ev.target&&ev.target.id==='sheet-form'){ev.preventDefault();submitForm(ev.target)}
+  if(ev.target&&ev.target.id==='recover-form'){
+    ev.preventDefault();
+    recoverPw($('#rk0').value,$('#rkid').value,$('#rk1').value,$('#rk2').value).then(function(){var a=$('#rk1'),b=$('#rk2');if(a)a.value='';if(b)b.value=''});
+  }
+  if(ev.target&&ev.target.id==='lock-form'){
+    ev.preventDefault();
+    var p1=$('#lk1'),p2=$('#lk2');
+    unlock($('#lk0').value,p1.value,p2?p2.value:'').then(function(){var a=$('#lk1'),b=$('#lk2');if(a)a.value='';if(b)b.value=''});
+  }
+});
+document.addEventListener('input',function(ev){
+  if(ev.target&&ev.target.id==='q'){S.q=ev.target.value;$('#lista').innerHTML=casosList()}
+});
+document.addEventListener('change',function(ev){
+  var t=ev.target;if(!t)return;
+  if(t.id==='rk-ok'){$('#rk-done').disabled=!t.checked}
+  if(t.id==='f-cobrado'){
+    $('#cobro-box').hidden=!t.checked;
+    if(t.checked&&!$('#f-fcobro').value)$('#f-fcobro').value=today();
+    if(t.checked)$('#f-importe').focus();
+  }
+  if(t.id==='f-tipo'&&$('#plazo-txt'))$('#plazo-txt').textContent=plazo(t.value);
+});
+document.addEventListener('keydown',function(ev){if(ev.key==='Escape'&&$('#sheet-form'))closeSheet()});
+
+render();
+connect();
+})();
+</script>
+
+</body></html>
