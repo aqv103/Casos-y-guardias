@@ -166,6 +166,14 @@ main{padding-block:12px 96px}
 .lockbox .field input{width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:16px}
 .rk{font-size:19px;letter-spacing:.04em;padding:14px;background:var(--surface2);border-radius:10px;text-align:center;overflow-wrap:anywhere;user-select:all;margin:16px 0 12px;font-weight:500}
 .rk-actions{display:flex;gap:8px;margin-bottom:12px}
+.vh{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+label.btn{display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.data-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.dsec{display:grid;gap:6px;justify-items:start}
+.restore{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);display:grid;gap:6px;justify-items:start}
+.top-row{flex-wrap:wrap}
+.top-tools{flex-wrap:wrap}
+.hint.bad{color:var(--bad)}
 /* Formularios */
 .field{display:grid;gap:6px}
 .field label,.lbl{font-size:13px;font-weight:600}
@@ -206,7 +214,8 @@ main{padding-block:12px 96px}
       <h1 class="brand">Guardias y Cobros</h1>
       <div class="top-tools">
         <span class="sync" id="sync"><i></i><span>Conectando</span></span>
-        <button class="btn sm" data-action="settings" type="button">Plazos</button>
+        <button class="btn sm" data-action="settings" id="plazosbtn" type="button">Plazos</button>
+        <button class="btn sm" data-action="data" id="databtn" type="button">Datos</button>
         <button class="btn sm" data-action="lock" id="lockbtn" type="button" hidden>Bloquear</button>
       </div>
     </div>
@@ -491,6 +500,7 @@ function lockView(){
      '<button type="button" class="btn ghost" data-action="back-lock">Volver</button></form></section>';
   }
   var ctx=S.where==='browser'?'este navegador':'esta cuenta';
+  var RESTORE='<div class="restore"><span class="hint">¿Ya tienes una copia cifrada de otro dispositivo?</span><label class="btn ghost" for="restore-file">Restaurar copia cifrada</label><input type="file" id="restore-file" accept=".json,application/json" class="vh"></div>';
   var cur=S.authTab||(setup?'signup':'login');
   var tabs='<div class="seg authseg" role="group" aria-label="Acceso">'+[['login','Iniciar sesión'],['signup','Registrarse']].map(function(t){return '<button type="button" data-action="auth-tab" data-v="'+t[0]+'" aria-pressed="'+(cur===t[0])+'">'+t[1]+'</button>'}).join('')+'</div>';
   if(cur==='signup'&&!setup){
@@ -501,7 +511,7 @@ function lockView(){
   if(cur==='login'&&setup){
     return '<section class="card pad lockbox">'+tabs+'<h2 class="lock-h">Todavía no tienes acceso</h2>'+
      '<p class="muted">Aún no has creado un acceso en '+ctx+'. Regístrate con un correo o teléfono y una contraseña y después podrás iniciar sesión cuando quieras.</p>'+
-     '<button type="button" class="btn primary" style="margin-top:14px" data-action="auth-tab" data-v="signup">Ir a registrarse</button></section>';
+     '<button type="button" class="btn primary" style="margin-top:14px" data-action="auth-tab" data-v="signup">Ir a registrarse</button><p class="err" id="lock-err" role="alert"></p>'+RESTORE+'</section>';
   }
   return '<section class="card pad lockbox">'+tabs+'<h2 class="lock-h">'+(setup?'Regístrate':'Iniciar sesión')+'</h2>'+
    '<p class="muted">'+(setup?'Elige un correo o teléfono y una contraseña. Todo lo que registres se cifra en este dispositivo antes de guardarse, así que sin los dos nadie puede leerlo. Después te daré una clave de recuperación por si los olvidas.':first?'Desde ahora entrarás con un correo o teléfono y tu contraseña. Indica el que quieres usar y tu contraseña actual.':'Introduce tu correo o teléfono y tu contraseña para ver tus guardias y casos.')+'</p>'+
@@ -512,7 +522,7 @@ function lockView(){
    '<p class="err" id="lock-err" role="alert"></p>'+
    '<button type="submit" class="btn primary">'+(setup?'Registrarme y entrar':'Entrar')+'</button>'+
    (!setup&&S.meta&&S.meta.wrapRec?'<button type="button" class="btn ghost" data-action="forgot">He olvidado mis datos de acceso</button>':'')+
-   '</form>'+(S.where==='browser'?'<p class="note" style="margin-top:14px">Tus datos se guardan cifrados solo en este navegador. No se sincronizan con otros dispositivos y se perderían si borras los datos del navegador.</p>':'')+'</section>';
+   '</form>'+(S.where==='browser'?'<p class="note" style="margin-top:14px">Tus datos se guardan cifrados solo en este navegador. No se sincronizan con otros dispositivos y se perderían si borras los datos del navegador.</p>':'')+(setup?RESTORE:'')+'</section>';
 }
 function rkView(){
   return '<section class="card pad lockbox"><h2 class="lock-h">Guarda tu clave de recuperación</h2>'+
@@ -611,8 +621,7 @@ function vResumen(){
     '<section class="card"><h2 class="card-title">Próximas guardias</h2><p class="card-sub">Desde hoy en adelante.</p>'+
      (nextG.length?'<div class="list">'+nextG.map(function(i){return row(i,{noActions:true})}).join('')+'</div>':'<p class="empty">No hay guardias futuras registradas.</p>')+'</section>'+
    '</div>'+
-  '</div>'+
-  '<div class="bottom-tools"><button type="button" class="btn" data-action="export">Exportar a CSV</button></div>';
+  '</div>';
 }
 
 function vGuardias(){
@@ -687,6 +696,7 @@ function render(){
   else if(S.mode==='local'){st.className='sync warn';st.innerHTML='<i></i><span>Sin conexión a tu cuenta</span>'}
   else{st.className='sync';st.innerHTML='<i></i><span>Conectando</span>'}
   var gate=S.mode==='nube'&&(S.locked||!!S.pendingRK);
+  ['plazosbtn','databtn'].forEach(function(id){var b=$('#'+id);if(b)b.hidden=gate});
   var lk=$('#lockbtn');if(lk)lk.hidden=gate||S.mode!=='nube';
   var tn=$('#tabs');if(tn)tn.hidden=gate;
   if(gate){$('#view').innerHTML=S.locked?lockView():rkView();return}
@@ -807,25 +817,161 @@ function csvCell(x){
   if(/^[=+\-@]/.test(s))s="'"+s;
   return '"'+s.replace(/"/g,'""')+'"';
 }
+async function saveFile(filename,text,mime){
+  var cl=window.claude,dl=null;
+  try{dl=cl&&cl.use?await cl.use('downloads'):null}catch(e){dl=null}
+  if(dl){
+    try{await dl.save({filename:filename,data:text});return true}
+    catch(e){if(!e||e.code!=='declined')toast('No se pudo preparar el archivo.');return false}
+  }
+  try{
+    var blob=new Blob([text],{type:mime});
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(a.href)},1500);
+    return true;
+  }catch(e){toast('No se pudo preparar el archivo.');return false}
+}
 async function exportCsv(){
   var head=['Registro','Fecha','Tipo','Cliente o lugar','Expediente','Área','Importe','Cobro previsto o estimado','Estado','Fecha de cobro','Notas'];
   var rows=items().sort(function(a,b){return (a.fecha||'')<(b.fecha||'')?-1:1}).map(function(i){
     var g=i._k==='guardias';
     return [g?'Guardia':'Caso',i.fecha||'',tipoLabel(i.tipo),g?(i.lugar||''):(i.titulo||''),i.ref||'',i.area||'',(i.importe?String(i.importe).replace('.',','):''),esperado(i)||'',estadoLabel[estado(i)],i.fechaCobro||'',i.notas||''].map(csvCell).join(';');
   });
-  var text='\ufeff'+head.map(csvCell).join(';')+'\r\n'+rows.join('\r\n');
-  var cl=window.claude,dl=null;
-  try{dl=cl&&cl.use?await cl.use('downloads'):null}catch(e){dl=null}
-  if(dl){
-    try{await dl.save({filename:'guardias-y-cobros.csv',data:text})}catch(e){if(!e||e.code!=='declined')toast('No se pudo preparar el archivo.')}
-    return;
-  }
+  await saveFile('guardias-y-cobros.csv','﻿'+head.map(csvCell).join(';')+'\r\n'+rows.join('\r\n'),'text/csv;charset=utf-8');
+}
+async function exportBackup(){
+  if(!S.key||!S.meta){setMsg('La copia cifrada solo está disponible con el acceso protegido.',true);return}
   try{
-    var blob=new Blob([text],{type:'text/csv;charset=utf-8'});
-    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='guardias-y-cobros.csv';
-    document.body.appendChild(a);a.click();a.remove();
-    setTimeout(function(){URL.revokeObjectURL(a.href)},1500);
-  }catch(e){toast('No se pudo preparar el archivo.')}
+    var gs=[],cs=[],i;
+    for(i=0;i<S.guardias.length;i++)gs.push({id:S.guardias[i].id,box:await seal(toData(S.guardias[i]))});
+    for(i=0;i<S.casos.length;i++)cs.push({id:S.casos[i].id,box:await seal(toData(S.casos[i]))});
+    var meta=Object.assign({},S.meta,{cfg:await seal(S.cfg)});
+    var d={app:'guardias-y-cobros',v:1,creado:new Date().toISOString(),meta:meta,guardias:gs,casos:cs};
+    if(await saveFile('copia-guardias-'+today()+'.json',JSON.stringify(d),'application/json'))setMsg('Copia cifrada preparada.',false);
+  }catch(e){setMsg('No se pudo preparar la copia.',true)}
+}
+function setMsg(t,bad){var m=$('#data-msg');if(m){m.textContent=t;m.className='hint'+(bad?' bad':'')}else toast(t)}
+function readText(file){
+  return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(String(r.result||''))};r.onerror=function(){rej(r.error)};r.readAsText(file)});
+}
+function parseCSV(t){
+  t=t.replace(/^﻿/,'');
+  var l1=t.split(/\r?\n/)[0]||'',sep=l1.split(';').length>=l1.split(',').length?';':',';
+  var rows=[],row=[],cur='',q=false,keep=function(r){return r.some(function(x){return x.trim()!==''})};
+  for(var i=0;i<t.length;i++){
+    var c=t[i];
+    if(q){if(c==='"'){if(t[i+1]==='"'){cur+='"';i++}else q=false}else cur+=c}
+    else if(c==='"')q=true;
+    else if(c===sep){row.push(cur);cur=''}
+    else if(c==='\n'||c==='\r'){if(c==='\r'&&t[i+1]==='\n')i++;row.push(cur);cur='';if(keep(row))rows.push(row);row=[]}
+    else cur+=c;
+  }
+  row.push(cur);if(keep(row))rows.push(row);
+  return rows;
+}
+function normDate(x){
+  x=String(x||'').trim();var y,m,d,mm=x.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(mm){y=+mm[1];m=+mm[2];d=+mm[3]}
+  else{mm=x.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/);if(!mm)return '';d=+mm[1];m=+mm[2];y=+mm[3]}
+  var s2=y+'-'+pad(m)+'-'+pad(d);
+  return iso(parse(s2))===s2?s2:'';
+}
+async function importCsv(text){
+  var rows=parseCSV(text);
+  if(rows.length<2)return {err:'El archivo no tiene filas para importar.'};
+  if(rows.length>2001)return {err:'El archivo tiene demasiadas filas. Divídelo en partes de 2000 como máximo.'};
+  var strip=function(h){return String(h||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim()};
+  var H=rows[0].map(strip);
+  var col=function(names){for(var i=0;i<names.length;i++){var ix=H.indexOf(names[i]);if(ix>-1)return ix}return -1};
+  var cReg=col(['registro']),cFecha=col(['fecha']),cTipo=col(['tipo']),cTit=col(['cliente o lugar','cliente','asunto','lugar','titulo']),
+      cRef=col(['expediente','n expediente','n. expediente']),cArea=col(['area']),cImp=col(['importe']),cEst=col(['estado']),cFc=col(['fecha de cobro']),cNot=col(['notas']);
+  if(cFecha<0)return {err:'No encuentro la columna "Fecha". Usa las mismas columnas que el CSV exportado.'};
+  var cell=function(r,c){if(c<0)return '';var v=String(r[c]==null?'':r[c]).trim();if(/^'[=+\-@]/.test(v))v=v.slice(1);return v};
+  var n=0,skip=0;
+  for(var i=1;i<rows.length;i++){
+    var r=rows[i],fecha=normDate(cell(r,cFecha)),reg=strip(cell(r,cReg)),isG=reg.indexOf('guard')===0;
+    var tit=cell(r,cTit),tipo=/privad/.test(strip(cell(r,cTipo)))?'privado':'oficio';
+    var cobrado=strip(cell(r,cEst))==='cobrado',imp=parseNum(cell(r,cImp));
+    var o={fecha:fecha,tipo:tipo,importe:imp,cobrado:cobrado,fechaCobro:cobrado?(normDate(cell(r,cFc))||today()):null,notas:cell(r,cNot),creado:new Date().toISOString()};
+    var kind;
+    if(isG){if(!fecha){skip++;continue}o.lugar=tit;kind='guardias'}
+    else{if(!tit){skip++;continue}o.fecha=fecha||today();o.titulo=tit;o.ref=cell(r,cRef);o.area=cell(r,cArea);o.estado='curso';kind='casos'}
+    if(await save(kind,o))n++;else skip++;
+  }
+  return {n:n,skip:skip};
+}
+var ID_OK=/^[A-Za-z0-9_.:@+~\-]{1,100}$/;
+var boxOk=function(b){return b&&typeof b.iv==='string'&&typeof b.d==='string'&&b.iv.length<100&&b.d.length<400000};
+async function importBackup(d){
+  var n=0,bad=0;
+  var run=async function(kind,list){
+    for(var i=0;i<list.length;i++){
+      var x=list[i];
+      if(!x||!boxOk(x.box)){bad++;continue}
+      var o;try{o=await openBox(x.box)}catch(e){bad++;continue}
+      var obj=Object.assign({},o);if(ID_OK.test(String(x.id||'')))obj.id=String(x.id);
+      if(await save(kind,obj))n++;else bad++;
+    }
+  };
+  await run('guardias',Array.isArray(d.guardias)?d.guardias.slice(0,2000):[]);
+  await run('casos',Array.isArray(d.casos)?d.casos.slice(0,2000):[]);
+  return {n:n,bad:bad};
+}
+async function handleImport(file){
+  if(file.size>10*1024*1024){setMsg('El archivo es demasiado grande.',true);return}
+  setMsg('Importando…',false);
+  try{
+    var text=await readText(file),res;
+    if(/\.json$/i.test(file.name)||/^\s*\{/.test(text)){
+      var d;try{d=JSON.parse(text)}catch(e){setMsg('El archivo no se puede leer.',true);return}
+      if(!d||d.app!=='guardias-y-cobros'){setMsg('Este archivo no es una copia de esta app.',true);return}
+      if(!S.key){setMsg('Inicia sesión para importar una copia.',true);return}
+      res=await importBackup(d);
+      if(!res.n&&res.bad){setMsg('No se pudo leer ningún registro. La copia pertenece a otro acceso. Para pasarla a un dispositivo nuevo, usa "Restaurar copia cifrada" al registrarte.',true);return}
+      setMsg('Importados '+plural(res.n,'registro','registros')+(res.bad?'. No se pudieron leer '+res.bad+'.':'.'),false);
+    }else{
+      res=await importCsv(text);
+      if(res.err){setMsg(res.err,true);return}
+      setMsg('Importados '+plural(res.n,'registro','registros')+(res.skip?'. Se omitieron '+res.skip+' filas sin fecha o sin nombre.':'.'),false);
+    }
+    render();
+  }catch(e){setMsg('No se pudo importar el archivo.',true)}
+}
+async function handleRestore(file){
+  var err=$('#lock-err');if(err)err.textContent='';
+  var fail=function(m){if(err)err.textContent=m;else toast(m)};
+  try{
+    if(!S.setup||!refs){fail('Ya hay un acceso creado aquí, no se puede restaurar encima.');return}
+    if(file.size>20*1024*1024){fail('El archivo es demasiado grande.');return}
+    var d;try{d=JSON.parse(await readText(file))}catch(e){fail('El archivo no se puede leer.');return}
+    var m=d&&d.meta;
+    if(!d||d.app!=='guardias-y-cobros'||!m||typeof m.salt!=='string'||!m.wrapPw&&!m.check||!boxOk(m.check)){fail('Este archivo no es una copia de esta app.');return}
+    await refs.app.set(m);
+    var put=async function(kind,list){
+      for(var i=0;i<list.length;i++){
+        var x=list[i];if(!x||!boxOk(x.box))continue;
+        var id=ID_OK.test(String(x.id||''))?String(x.id):null;
+        await refs[kind].doc(id||undefined).set({v:1,iv:x.box.iv,d:x.box.d});
+      }
+    };
+    await put('guardias',Array.isArray(d.guardias)?d.guardias.slice(0,2000):[]);
+    await put('casos',Array.isArray(d.casos)?d.casos.slice(0,2000):[]);
+    S.meta=m;S.setup=false;S.authTab='login';render();
+    toast('Copia restaurada. Inicia sesión con tu correo o teléfono y tu contraseña.');
+  }catch(e){fail('No se pudo restaurar la copia. Inténtalo de nuevo.')}
+}
+function openData(){
+  if(S.mode==='nube'&&S.locked)return;
+  editing=null;
+  openSheet('<div class="fields">'+
+   '<div class="dsec"><h3 class="lbl">Exportar</h3><p class="hint">El CSV se abre en Excel y no va cifrado, así que guárdalo con cuidado. La copia cifrada solo se abre con tu acceso y sirve de copia de seguridad.</p>'+
+   '<div class="data-btns"><button type="button" class="btn" data-action="export">Exportar a CSV</button><button type="button" class="btn" data-action="export-backup">Copia cifrada</button></div></div>'+
+   '<div class="dsec"><h3 class="lbl">Importar</h3><p class="hint">Elige un CSV con columnas como Fecha, Tipo, Cliente o lugar, Expediente, Área, Importe, Estado, Fecha de cobro y Notas, o una copia cifrada. Lo que importes se añade a lo que ya tienes. Para una guardia, pon Guardia en la columna Registro.</p>'+
+   '<label class="btn" for="import-file">Elegir archivo</label><input type="file" id="import-file" accept=".csv,.json,text/csv,application/json" class="vh"></div>'+
+   '<p class="hint" id="data-msg" role="status"></p></div>'+
+   '<footer><div class="grp"></div><div class="grp"><button type="button" class="btn" data-action="close-sheet">Cerrar</button></div></footer>',
+   'Importar y exportar','data');
 }
 
 /* ---------- eventos ---------- */
@@ -862,6 +1008,8 @@ document.addEventListener('click',async function(ev){
     case 'rk-done':S.pendingRK=null;render();break;
     case 'settings':openSettings();break;
     case 'export':exportCsv();break;
+    case 'export-backup':exportBackup();break;
+    case 'data':openData();break;
     case 'f-tipo':S.fTipo=v;render();break;
     case 'f-estado':S.fEstado=v;render();break;
     case 'del-ask':$('#del-ask').hidden=true;$('#del-confirm').hidden=false;break;
@@ -888,6 +1036,8 @@ document.addEventListener('input',function(ev){
 });
 document.addEventListener('change',function(ev){
   var t=ev.target;if(!t)return;
+  if(t.id==='import-file'&&t.files&&t.files[0]){handleImport(t.files[0]);t.value=''}
+  if(t.id==='restore-file'&&t.files&&t.files[0]){handleRestore(t.files[0]);t.value=''}
   if(t.id==='rk-ok'){$('#rk-done').disabled=!t.checked}
   if(t.id==='f-cobrado'){
     $('#cobro-box').hidden=!t.checked;
