@@ -214,8 +214,8 @@ label.btn{display:inline-flex;align-items:center;justify-content:center;cursor:p
       <h1 class="brand">Guardias y Cobros</h1>
       <div class="top-tools">
         <span class="sync" id="sync"><i></i><span>Conectando</span></span>
-        <button class="btn sm" data-action="settings" id="plazosbtn" type="button">Plazos</button>
         <button class="btn sm" data-action="data" id="databtn" type="button">Datos</button>
+        <label class="btn sm" for="import-file-top" id="importbtn">Importar</label><input type="file" id="import-file-top" accept=".csv,.json,text/csv,application/json" class="vh">
         <button class="btn sm" data-action="lock" id="lockbtn" type="button" hidden>Bloquear</button>
       </div>
     </div>
@@ -265,7 +265,8 @@ var items=function(){
     .concat(S.casos.map(function(c){return Object.assign({},c,{_k:'casos'})}));
 };
 var esperado=function(i){return i.cobroPrevisto||(i.fecha?addDays(i.fecha,plazo(i.tipo)):null)};
-var estado=function(i){if(i.cobrado)return 'cobrado';var e=esperado(i);return e&&e<today()?'retrasado':'pendiente'};
+var estado=function(i){return i.cobrado?'cobrado':'pendiente'};
+var desde=function(f){var d=diff(today(),f);return d<=0?'desde hoy':d===1?'desde ayer':'desde hace '+d+' días'};
 var sum=function(a){return a.reduce(function(s,i){return s+(+i.importe||0)},0)};
 var tipoLabel=function(t){return t==='oficio'?'Oficio':'Privado'};
 var estadoLabel={pendiente:'Pendiente',retrasado:'Retrasado',cobrado:'Cobrado'};
@@ -537,7 +538,7 @@ function rkView(){
 /* ---------- componentes ---------- */
 function row(i,opts){
   opts=opts||{};
-  var g=i._k==='guardias',st=estado(i),e=esperado(i);
+  var g=i._k==='guardias',st=estado(i);
   var title=g?(i.lugar||'Guardia sin lugar'):(i.titulo||'Caso sin nombre');
   var meta=['<span class="chip '+esc(i.tipo)+'">'+tipoLabel(i.tipo)+'</span>',g?'Guardia':'Caso'];
   if(!g&&i.ref)meta.push('Exp. '+esc(i.ref));
@@ -545,7 +546,7 @@ function row(i,opts){
   if(!g&&i.estado==='cerrado')meta.push('Cerrado');
   var pay='';
   if(i.cobrado){pay='Cobrado el '+fmtDate(i.fechaCobro||i.fecha)}
-  else if(e){pay='Cobro '+(i.cobroPrevisto?'previsto':'estimado')+' el '+fmtDate(e)+' ('+rel(e)+')'}
+  else if(i.fecha&&i.fecha<=today()){pay='Sin cobrar '+desde(i.fecha)}
   var d=parse(i.fecha||today());
   var act=opts.noActions?'':
     '<div class="row-actions">'+
@@ -559,7 +560,7 @@ function row(i,opts){
 }
 function emptyAll(){
   return '<section class="card empty"><h3>Aquí verás cuándo te pagan</h3>'+
-    '<p>Registra tus guardias y tus casos. La app calcula la fecha de cobro estimada y marca lo que va retrasado. El importe lo indicas cuando te pagan.</p>'+
+    '<p>Registra tus guardias y tus casos. Cuando te paguen, márcalos como cobrados e indica el importe. La app te muestra lo que sigue sin cobrar.</p>'+
     '<div class="btns"><button type="button" class="btn primary" data-action="new-guardia">Añadir una guardia</button>'+
     '<button type="button" class="btn" data-action="new-caso">Añadir un caso</button></div></section>';
 }
@@ -573,51 +574,26 @@ function modeNote(){
 function vResumen(){
   var all=items();
   if(!all.length)return modeNote()+emptyAll();
-  var T=today(),pend=all.filter(function(i){return !i.cobrado});
-  var retr=pend.filter(function(i){return estado(i)==='retrasado'});
-  var prox=pend.filter(function(i){var e=esperado(i);return e>=T&&e<=addDays(T,30)});
-  var year=T.slice(0,4);
-  var cobY=all.filter(function(i){return i.cobrado&&(i.fechaCobro||i.fecha||'').slice(0,4)===year});
-
-  var now=new Date(),buckets=[{l:'Atrasado',v:0,c:'late'}],keys=[];
-  for(var k=0;k<6;k++){
-    var m=new Date(now.getFullYear(),now.getMonth()+k,1);
-    keys.push(m.getFullYear()+'-'+pad(m.getMonth()+1));
-    buckets.push({l:m.toLocaleDateString('es-ES',{month:'short'}).replace('.',''),v:0,c:''});
-  }
-  buckets.push({l:'Después',v:0,c:'later'});
-  pend.forEach(function(i){
-    var e=esperado(i);if(!e)return;var amt=1;
-    if(e<T){buckets[0].v+=amt;return}
-    var ix=keys.indexOf(e.slice(0,7));
-    if(ix>-1)buckets[ix+1].v+=amt;else buckets[7].v+=amt;
-  });
-  var max=Math.max.apply(null,buckets.map(function(b){return b.v}).concat([1]));
-
-  var chart=buckets.map(function(b){
-    var h=b.v?Math.max(4,b.v/max*100):0;
-    return '<div class="col"><span class="val">'+(b.v?compact(b.v):'')+'</span><div class="well"><div class="bar '+(b.v?b.c:'zero')+'" style="height:'+(b.v?h:2)+'%"></div></div><span class="lab">'+esc(b.l)+'</span></div>';
-  }).join('');
-
-  var nextPay=pend.filter(function(i){return esperado(i)}).sort(function(a,b){return esperado(a)<esperado(b)?-1:1}).slice(0,6);
+  var T=today(),year=T.slice(0,4),month=T.slice(0,7);
+  var pend=all.filter(function(i){return !i.cobrado}).sort(function(a,b){return (a.fecha||'')<(b.fecha||'')?-1:1});
+  var cobAt=function(i,n){return i.cobrado&&(i.fechaCobro||i.fecha||'').slice(0,n)};
+  var cobY=all.filter(function(i){return cobAt(i,4)===year});
+  var cobM=all.filter(function(i){return cobAt(i,7)===month});
   var nextG=S.guardias.filter(function(g){return g.fecha>=T}).sort(function(a,b){return a.fecha<b.fecha?-1:1}).slice(0,4).map(function(g){return Object.assign({},g,{_k:'guardias'})});
-
+  var shown=pend.slice(0,8);
   return modeNote()+
   '<div class="grid two">'+
    '<div class="stack">'+
-    '<section class="card hero"><p class="eyebrow">Pendiente de cobro</p><p class="big">'+pend.length+'</p>'+
-     '<p class="muted">'+(pend.length===1?'partida sin cobrar':'partidas sin cobrar')+'</p>'+
+    '<section class="card hero"><p class="eyebrow">Sin cobrar</p><p class="big">'+pend.length+'</p>'+
+     '<p class="muted">'+(pend.length===1?'partida pendiente de cobro':'partidas pendientes de cobro')+'</p>'+
      '<dl class="stats">'+
-      '<div><dt>Retrasado</dt><dd class="'+(retr.length?'bad':'')+'">'+retr.length+'</dd></div>'+
-      '<div><dt>Próximos 30 días</dt><dd>'+prox.length+'</dd></div>'+
+      '<div><dt>Cobrado este mes</dt><dd class="ok">'+money(sum(cobM))+'</dd></div>'+
       '<div><dt>Cobrado en '+year+'</dt><dd class="ok">'+money(sum(cobY))+'</dd></div>'+
      '</dl></section>'+
-    '<section class="card"><h2 class="card-title">Cobros previstos por mes</h2><p class="card-sub">Partidas pendientes según su fecha de cobro estimada.</p>'+
-     '<div class="chart" role="img" aria-label="Partidas pendientes por mes de cobro estimado">'+chart+'</div></section>'+
+    '<section class="card"><h2 class="card-title">Pendientes de cobro</h2><p class="card-sub">Las más antiguas primero. Márcalas cuando te paguen.</p>'+
+     (shown.length?'<div class="list">'+shown.map(function(i){return row(i)}).join('')+'</div>'+(pend.length>shown.length?'<p class="card-sub" style="padding:12px 18px">Y '+(pend.length-shown.length)+' más en Guardias y Casos.</p>':''):'<p class="empty">Todo está cobrado.</p>')+'</section>'+
    '</div>'+
    '<div class="stack">'+
-    '<section class="card"><h2 class="card-title">Próximos cobros</h2><p class="card-sub">Lo primero que debería llegar.</p>'+
-     (nextPay.length?'<div class="list">'+nextPay.map(function(i){return row(i,{noActions:true})}).join('')+'</div>':'<p class="empty">Todo está cobrado.</p>')+'</section>'+
     '<section class="card"><h2 class="card-title">Próximas guardias</h2><p class="card-sub">Desde hoy en adelante.</p>'+
      (nextG.length?'<div class="list">'+nextG.map(function(i){return row(i,{noActions:true})}).join('')+'</div>':'<p class="empty">No hay guardias futuras registradas.</p>')+'</section>'+
    '</div>'+
@@ -675,7 +651,7 @@ function filteredCasos(){
 }
 function casosList(){
   var list=filteredCasos();
-  if(!S.casos.length)return '<section class="card empty"><h3>Aún no hay casos</h3><p>Añade cada caso de oficio o privado y la app te dirá cuándo debería llegar el pago.</p><div class="btns"><button type="button" class="btn primary" data-action="new-caso">Añadir un caso</button></div></section>';
+  if(!S.casos.length)return '<section class="card empty"><h3>Aún no hay casos</h3><p>Añade cada caso de oficio o privado y márcalo como cobrado cuando te paguen.</p><div class="btns"><button type="button" class="btn primary" data-action="new-caso">Añadir un caso</button></div></section>';
   if(!list.length)return '<section class="card empty"><p>Ningún caso coincide con los filtros.</p></section>';
   return '<section class="card"><p class="card-sub" style="padding-top:14px">'+plural(list.length,'caso','casos')+(sum(list.filter(function(i){return i.cobrado}))?' · cobrado '+money(sum(list.filter(function(i){return i.cobrado}))):'')+'</p><div class="list">'+list.map(function(i){return row(i)}).join('')+'</div></section>';
 }
@@ -696,7 +672,7 @@ function render(){
   else if(S.mode==='local'){st.className='sync warn';st.innerHTML='<i></i><span>Sin conexión a tu cuenta</span>'}
   else{st.className='sync';st.innerHTML='<i></i><span>Conectando</span>'}
   var gate=S.mode==='nube'&&(S.locked||!!S.pendingRK);
-  ['plazosbtn','databtn'].forEach(function(id){var b=$('#'+id);if(b)b.hidden=gate});
+  ['plazosbtn','databtn','importbtn'].forEach(function(id){var b=$('#'+id);if(b)b.hidden=gate});
   var lk=$('#lockbtn');if(lk)lk.hidden=gate||S.mode!=='nube';
   var tn=$('#tabs');if(tn)tn.hidden=gate;
   if(gate){$('#view').innerHTML=S.locked?lockView():rkView();return}
@@ -723,9 +699,7 @@ function openSheet(html,title,key){
 }
 function closeSheet(){$('#sheet-root').innerHTML='';document.documentElement.classList.remove('lock');editing=null}
 function payFields(o){
-  var ps=plazo(o.tipo||'oficio');
-  return '<p class="hint">La fecha de cobro se calcula sola con tus plazos (<span id="plazo-txt">'+ps+'</span> días para este tipo). Puedes cambiarlos en Plazos.</p>'+
-   '<label class="check"><input type="checkbox" id="f-cobrado"'+(o.cobrado?' checked':'')+'> Ya está cobrado</label>'+
+  return '<label class="check"><input type="checkbox" id="f-cobrado"'+(o.cobrado?' checked':'')+'> Ya está cobrado</label>'+
    '<div id="cobro-box"'+(o.cobrado?'':' hidden')+'><div class="two-col">'+
     field('f-importe','Importe cobrado (€)','<input type="text" id="f-importe" inputmode="decimal" autocomplete="off" value="'+esc(o.importe?String(o.importe).replace('.',','):'')+'" placeholder="0,00">')+
     field('f-fcobro','Fecha de cobro','<input type="date" id="f-fcobro" value="'+esc(o.fechaCobro||'')+'">')+'</div></div>'+
@@ -833,10 +807,10 @@ async function saveFile(filename,text,mime){
   }catch(e){toast('No se pudo preparar el archivo.');return false}
 }
 async function exportCsv(){
-  var head=['Registro','Fecha','Tipo','Cliente o lugar','Expediente','Área','Importe','Cobro previsto o estimado','Estado','Fecha de cobro','Notas'];
+  var head=['Registro','Fecha','Tipo','Cliente o lugar','Expediente','Área','Importe','Estado','Fecha de cobro','Notas'];
   var rows=items().sort(function(a,b){return (a.fecha||'')<(b.fecha||'')?-1:1}).map(function(i){
     var g=i._k==='guardias';
-    return [g?'Guardia':'Caso',i.fecha||'',tipoLabel(i.tipo),g?(i.lugar||''):(i.titulo||''),i.ref||'',i.area||'',(i.importe?String(i.importe).replace('.',','):''),esperado(i)||'',estadoLabel[estado(i)],i.fechaCobro||'',i.notas||''].map(csvCell).join(';');
+    return [g?'Guardia':'Caso',i.fecha||'',tipoLabel(i.tipo),g?(i.lugar||''):(i.titulo||''),i.ref||'',i.area||'',(i.importe?String(i.importe).replace('.',','):''),estadoLabel[estado(i)],i.fechaCobro||'',i.notas||''].map(csvCell).join(';');
   });
   await saveFile('guardias-y-cobros.csv','﻿'+head.map(csvCell).join(';')+'\r\n'+rows.join('\r\n'),'text/csv;charset=utf-8');
 }
@@ -1036,7 +1010,7 @@ document.addEventListener('input',function(ev){
 });
 document.addEventListener('change',function(ev){
   var t=ev.target;if(!t)return;
-  if(t.id==='import-file'&&t.files&&t.files[0]){handleImport(t.files[0]);t.value=''}
+  if((t.id==='import-file'||t.id==='import-file-top')&&t.files&&t.files[0]){handleImport(t.files[0]);t.value=''}
   if(t.id==='restore-file'&&t.files&&t.files[0]){handleRestore(t.files[0]);t.value=''}
   if(t.id==='rk-ok'){$('#rk-done').disabled=!t.checked}
   if(t.id==='f-cobrado'){
